@@ -1,0 +1,40 @@
+[project]
+name = "mfm"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "graphviz>=0.20.3",
+    "torchview>=0.2.6",
+    "parameterfree",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "pqdm",
+    "dask",
+    "pyarrow",
+    "fastparquet",
+    "ipdb",
+    "fire",
+    "h5py",
+    "pyyaml",
+    "pycox",
+    "torchtuples",
+    "scikit-survival",
+    "xgboost",
+    "textalloc",
+    "nbstripout>=0.8.2",
+    "notebook>=7.5.4",
+    "jupyterlab-vim>=4.1.4",
+    "statannotations>=0.7.2",
+    "openpyxl>=3.1.5",
+    "pytest>=8.4.2",
+]
+
+[project.optional-dependencies]
+notebook = [
+    "jupyter",
+    "ipykernel",
+]
+[tool.uv]
+torch-backend = "cu124"

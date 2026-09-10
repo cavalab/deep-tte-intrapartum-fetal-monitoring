@@ -1,0 +1,31 @@
+# Python and notebooks
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.DS_Store
+
+# Environments and test output
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Private data and derived artifacts
+data/*
+!data/README.md
+pretrained/*
+!pretrained/README.md
+final_model_selection/*
+!final_model_selection/README.md
+results/
+cache/
+jobs/
+logs/
+
+# Local scheduler and editor files
+*.sbatch
+.vscode/
+
+# Material copied from the source repository is not part of this paper repo.
+reference/
+CLAUDE.md
