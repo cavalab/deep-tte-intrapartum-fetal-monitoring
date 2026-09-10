@@ -98,7 +98,7 @@ uv run --active python -m postprocessing.postprocess_ctu_checkpoints \
 ```
 
 The external-validation notebook
-`notebooks/external_model_auroc_comparison.ipynb` runs this checkpoint
+`postprocessing/external_model_auroc_comparison.ipynb` runs this checkpoint
 evaluation for the private final-selection archive and builds the paper table.
 For baseline bundles, use the companion command-line evaluator:
 
@@ -111,6 +111,14 @@ uv run --active python postprocessing/postprocess_ctu_baselines.py \
   --output-dir results_final_model_selection_external_ctu/baselines
 ```
 
+## Postprocess model selection and figures
+
+From the repository root, run `postprocessing/model_selection.ipynb` first. It selects the best completed
+configuration in each model family and packages the selected metrics,
+predictions, histories, and checkpoints under `final_model_selection/`. Then
+run `notebooks/paper_figures.ipynb` to generate the paper figures from that
+selection archive.
+
 ## Repository layout
 
 - `train_time_to_event_models.py`: training and evaluation command-line entry
@@ -120,6 +128,10 @@ uv run --active python postprocessing/postprocess_ctu_baselines.py \
 - `time_to_event_evaluation.py`: landmark and bootstrap evaluation.
 - `preprocessing/CTU/`: public CTU-UHB download and conversion.
 - `postprocessing/`: checkpoint replay and baseline external-evaluation tools.
-- `notebooks/external_model_auroc_comparison.ipynb`: CTU external-validation
-  evaluation and AUROC table generation.
+- `postprocessing/external_model_auroc_comparison.ipynb`: CTU
+  external-validation evaluation and AUROC table generation.
+- `postprocessing/model_selection.ipynb`: model selection and packaging of the
+  artifacts consumed by `paper_figures.ipynb`.
+- `notebooks/paper_figures.ipynb`: paper figure generation from selected
+  artifacts.
 - `experiments/`: reproducible sweep configuration.
