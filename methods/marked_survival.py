@@ -132,7 +132,7 @@ def _duration_cuts(raw_durations, sample_rate_hz, durations=None, num_durations=
     return np.asarray(cuts, dtype=float)
 
 
-def load_parquet_chunked_optional_labels(
+def load_hdf5_chunked_optional_labels(
     trace_file,
     label_file,
     *,
@@ -148,8 +148,7 @@ def load_parquet_chunked_optional_labels(
 ):
     """Chunk every tracing and attach lab labels when they are available.
 
-    Unlike :func:`utils.load_parquet_chunked`, this loader deliberately uses a
-    left join.  A late, absent, or pH-missing lab therefore creates an
+    This loader deliberately uses a left join. A late, absent, or pH-missing lab creates an
     unobserved mark rather than removing an otherwise valid delivery tracing.
     """
     if chunk_window_size <= 0 or overlap < 0 or overlap >= chunk_window_size:
@@ -161,8 +160,8 @@ def load_parquet_chunked_optional_labels(
         traces = utils.load_hdf5_index(trace_file)
         traces["PID"] = traces["PID"].map(_normalise_pid)
     else:
-        traces = pd.read_parquet(trace_file)
-    labels = pd.read_parquet(label_file)
+        raise ValueError("Only HDF5 trace stores are supported.")
+    labels = utils.load_label_table(label_file)
     required_columns = ["PID", *label_columns]
     missing_columns = set(required_columns).difference(labels.columns)
     if missing_columns:
@@ -302,14 +301,14 @@ def load_marked_survival_data(
     """
     trace_file = str(trace_file)
     label_file = str(label_file)
-    labels_df = pd.read_parquet(label_file)
+    labels_df = utils.load_label_table(label_file)
     pairs = discover_ph_threshold_columns(labels_df.columns)
     threshold_columns = [c for _, c in pairs]
     if "pH Cord" not in labels_df.columns:
         raise ValueError("Marked survival requires the raw 'pH Cord' column.")
     # The optional-label path retains trace-only PIDs.  Existing loaders retain
     # their inner-join semantics for tasks requiring every label.
-    X, y, pids = load_parquet_chunked_optional_labels(
+    X, y, pids = load_hdf5_chunked_optional_labels(
         trace_file,
         label_file,
         features=list(features),
@@ -625,4 +624,3 @@ def joint_cumulative_risks(pmf, conditional_marks, horizons=None):
     """
     risks = joint_bin_risks(pmf, conditional_marks).cumsum(axis=1) if isinstance(pmf, np.ndarray) else joint_bin_risks(pmf, conditional_marks).cumsum(1)
     return risks if horizons is None else risks[:, horizons]
-

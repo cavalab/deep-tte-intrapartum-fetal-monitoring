@@ -1,12 +1,9 @@
-"""Create project-compatible CTU-UHB time-to-event data artifacts.
+"""Create project-compatible CTU-UHB time-to-event HDF5 artifacts.
 
 The public CTU-UHB source is distributed as WFDB records.  This script reads
 those records directly and writes the same variable-length HDF5 tracing index
-and label parquet tables used by the project's time-to-event experiments.
-The generated label tables include both a reproducible ordinary split and a
-full-cohort ``*_labs_test_all.parquet`` table.  The latter is intended for
-external-cohort evaluation, where every CTU tracing is treated as the test
-partition.
+and writes train/test outcome splits as parquet sidecars. Tracing data itself
+is always stored in HDF5.
 """
 
 from __future__ import annotations
@@ -340,11 +337,9 @@ def _run_single(
         sample_limit, sample_rate, horizon, max_gap_hours, window, min_length,
         tail_length, missingness,
     )
-    trace_path = output_dir / f"{trace_stem}.{'h5' if window == 0 else 'parquet'}"
-    if window == 0:
-        _write_hdf5(trace_path, records)
-    else:
-        pd.DataFrame.from_records(records).to_parquet(trace_path, index=False)
+    if window != 0:
+        raise ValueError("HDF5-only preprocessing requires window=0.")
+    trace_path = output_dir / f"{trace_stem}.h5"
 
     labels = _labels_from_records(records, record_paths)
     labs_train, labs_test = _split_labels(labels, split, seed)
@@ -353,18 +348,17 @@ def _run_single(
     test_all_path = output_dir / f"{CTU_PREFIX}_labs_test_all.parquet"
     labs_train.to_parquet(train_path, index=False)
     labs_test.to_parquet(test_path, index=False)
-    # Keep the split artifacts for workflows that need a CTU train/test split,
-    # and also emit the complete cohort as an explicit external-test table.
     labels.to_parquet(test_all_path, index=False)
+    _write_hdf5(trace_path, records)
 
     print(f"Wrote {len(records)} CTU tracings to {trace_path}")
-    print(f"Wrote {len(labs_train)} CTU training labels to {train_path}")
-    print(f"Wrote {len(labs_test)} CTU test labels to {test_path}")
-    print(f"Wrote {len(labels)} CTU all-as-test labels to {test_all_path}")
+    print(f"Wrote {len(labels)} outcome rows to parquet sidecars")
+    print(f"Wrote train/test label splits to {train_path} and {test_path}")
     if failures:
         print(f"Excluded records: {failures}")
     return {
         "trace_file": str(trace_path),
+        "label_file": str(test_all_path),
         "label_trainfile": str(train_path),
         "label_testfile": str(test_path),
         "label_test_allfile": str(test_all_path),

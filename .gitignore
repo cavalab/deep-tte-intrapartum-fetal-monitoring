@@ -18,6 +18,7 @@ pretrained/*
 final_model_selection/*
 !final_model_selection/README.md
 results/
+results_*/
 cache/
 jobs/
 logs/

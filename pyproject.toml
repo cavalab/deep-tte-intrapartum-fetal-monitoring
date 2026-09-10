@@ -13,7 +13,6 @@ dependencies = [
     "pqdm",
     "dask",
     "pyarrow",
-    "fastparquet",
     "ipdb",
     "fire",
     "h5py",
