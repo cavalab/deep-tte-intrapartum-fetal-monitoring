@@ -271,7 +271,7 @@ class PartialLabelDeepHit(DeepHit):
             # Preserve the pre-existing marginal NLL scale.  The ranking term
             # uses DeepHit's configured rank coefficient, matching the
             # observed-pH objective without making a row enter both rank sets.
-            missing_loss = missing_nll + (1.0 - self.loss.alpha) * missing_rank
+            missing_loss = self.loss.alpha * missing_nll + (1.0 - self.loss.alpha) * missing_rank
         else:
             missing_loss = logits.sum() * 0.0
             missing_nll = logits.sum() * 0.0
@@ -279,10 +279,7 @@ class PartialLabelDeepHit(DeepHit):
 
         total = (
             observed.sum() / total_count * observed_loss
-            + self.missing_delivery_loss_weight
-            * missing.sum()
-            / total_count
-            * missing_loss
+            + missing.sum() / total_count * missing_loss
         )
         return {
             "loss": total,
