@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 import re
 from pathlib import Path
 
@@ -146,8 +147,15 @@ def compute_hdf5_feature_stats(
     ]
     if cache_path is not None:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = cache_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"identity": identity, "feature_stats": stats}, indent=2))
+        # Multiple Slurm jobs can compute this shared cache entry concurrently.
+        # Give each writer a unique file in the target directory, then atomically
+        # publish it so one job cannot remove another job's temporary file.
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=cache_path.parent,
+            prefix=f".{cache_path.stem}.", suffix=".tmp", delete=False,
+        ) as handle:
+            json.dump({"identity": identity, "feature_stats": stats}, handle, indent=2)
+            temporary = Path(handle.name)
         os.replace(temporary, cache_path)
     return stats
 
