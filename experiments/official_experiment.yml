@@ -1,8 +1,9 @@
 # Official single-window time-to-event sweep.
 #
 # There are 9 receptive-field variants (3 depths x 3 kernel sets). The active
-# sweep crosses them with marked, joint competing-risk, and cause-specific
-# competing-risk variants under the two deterministic sampling regimes below.
+# sweep crosses them with marked and cause-specific competing-risk variants
+# under the deterministic sampling regimes below. Depth-3 variants use batch
+# size 1024 because they do not fit in the usable 48-GB GPU memory at 2048.
 # submit_jobs.py expands this to a Cartesian sweep.
 models:
   - Inception_classifier
@@ -50,15 +51,17 @@ train_kwargs:
   training_landmark_diagnostic_patients: 0
 
 # Validation remains deterministic at the fixed delivery endpoints for every
-# run. The cause-specific competing variants use the independent MLP head
-# architecture while retaining the same targets and sampling regimes as the
-# joint competing-risk controls.
+# run. The cause-specific competing variants use independent MLP heads while
+# retaining the marked-model sampling regimes.
 train_kwargs_variants:
-  - _name: marked_all_deterministic
+  - _name: marked_all_strata_deterministic
     mode: marked
-    training_sampling_strategy: all
-    epochs: 20
-    learning_rate: 0.005
+    training_sampling_strategy: stratified_elapsed_plus_terminal
+    training_chunks_per_patient_per_epoch: all_strata
+  - _name: marked_uniform_five_chunks_deterministic
+    mode: marked
+    training_sampling_strategy: uniform
+    training_chunks_per_patient_per_epoch: 5
   - _name: marked_quartiles_plus_terminal_deterministic
     mode: marked
     training_sampling_strategy: quartiles_plus_terminal
@@ -69,13 +72,18 @@ train_kwargs_variants:
     mode: marked
     training_sampling_strategy: stratified_elapsed
 
-  - _name: competing_cause_specific_all_deterministic
+  - _name: competing_cause_specific_all_strata_deterministic
     mode: competing
     competing_head: cause_specific
     competing_head_hidden_dims: [128, 64]
-    training_sampling_strategy: all
-    epochs: 20
-    learning_rate: 0.005
+    training_sampling_strategy: stratified_elapsed_plus_terminal
+    training_chunks_per_patient_per_epoch: all_strata
+  - _name: competing_cause_specific_uniform_five_chunks_deterministic
+    mode: competing
+    competing_head: cause_specific
+    competing_head_hidden_dims: [128, 64]
+    training_sampling_strategy: uniform
+    training_chunks_per_patient_per_epoch: 5
   - _name: competing_cause_specific_quartiles_plus_terminal_deterministic
     mode: competing
     competing_head: cause_specific
@@ -92,19 +100,6 @@ train_kwargs_variants:
     competing_head_hidden_dims: [128, 64]
     training_sampling_strategy: stratified_elapsed
 
-  # - _name: competing_all_deterministic
-  #   mode: competing
-  #   training_sampling_strategy: all
-  # - _name: competing_quartiles_plus_terminal_deterministic
-  #   mode: competing
-  #   training_sampling_strategy: quartiles_plus_terminal
-  # - _name: competing_terminal_balanced_deterministic
-  #   mode: competing
-  #   training_sampling_strategy: terminal_balanced
-  # - _name: competing_stratified_elapsed_deterministic
-  #   mode: competing
-  #   training_sampling_strategy: stratified_elapsed
-
 model_fit_kwargs_map:
   Inception_classifier:
     - _name: depth1_k5_9_19
@@ -118,6 +113,7 @@ model_fit_kwargs_map:
       bottleneck_channels: 32
       kernel_sizes: [19, 9, 5]
     - _name: depth3_k5_9_19
+      batch_size: 1024
       n_filters: 32
       depth: 3
       bottleneck_channels: 32
@@ -133,6 +129,7 @@ model_fit_kwargs_map:
       bottleneck_channels: 32
       kernel_sizes: [39, 19, 9]
     - _name: depth3_k9_19_39
+      batch_size: 1024
       n_filters: 32
       depth: 3
       bottleneck_channels: 32
@@ -148,6 +145,7 @@ model_fit_kwargs_map:
       bottleneck_channels: 32
       kernel_sizes: [79, 39, 19]
     - _name: depth3_k19_39_79
+      batch_size: 1024
       n_filters: 32
       depth: 3
       bottleneck_channels: 32

@@ -225,8 +225,8 @@ class SubmitJobs:
         train_kwargs: dict[str, Any] | None = None,
         train_kwargs_variants: list[dict[str, Any]] | None = None,
         model_train_kwargs_variants_map: dict[str, Any] | None = None,
-        jobs_dir: str = "jobs",
-        logs_dir: str = "logs",
+        jobs_dir: str = "slurm_jobs",
+        logs_dir: str = "slurm_logs",
         submit: bool = False,
         print_only: bool = False,
         local: bool = False,
@@ -381,7 +381,8 @@ class SubmitJobs:
                 global_fit_kwargs=global_fit_kwargs,
             )
 
-            for variant_name, fit_kwargs in fit_kwargs_variants:
+            for variant_name, fit_kwargs, variant_batch_size in fit_kwargs_variants:
+                effective_batch_size = batch_size if variant_batch_size is None else variant_batch_size
                 fit_kwargs_json = json.dumps(fit_kwargs, separators=(",", ":"))
 
                 # Stuff for survival models
@@ -408,7 +409,7 @@ class SubmitJobs:
                         f"{model}{variant_suffix}{train_variant_suffix}_s{seed}_{optimizer_name}"
                         f"{evaluation_suffix}"
                         f"_m{int(round(missingness * 100))}"
-                        f"_bs{batch_size}_cs{chunksize}"
+                        f"_bs{effective_batch_size}_cs{chunksize}"
                         f"_lod{lab_delay}"
                         f"_dm-{duration_mode}"
                     )
@@ -426,7 +427,7 @@ class SubmitJobs:
                         "--trace_file", trace_file,
                         "--label_trainfile", label_trainfile,
                         "--ml", model, "--gpu", str(gpu), "--savedir", savedir,
-                        "--batch_size", str(batch_size), "--random_state", str(seed),
+                        "--batch_size", str(effective_batch_size), "--random_state", str(seed),
                         "--lab_order_delay", str(lab_delay),
                         "--chunk_window_size", str(chunksize), "--fit_kwargs", fit_kwargs_json,
                         "--splits_file", splits_file,
@@ -439,7 +440,7 @@ class SubmitJobs:
                         train_script, "run", "--data_dir", data_dir, "--horizon", str(horizon),
                         "--ml", model, "--window", str(window), "--gpu", str(gpu),
                         "--savedir", savedir, "--missingness", str(missingness),
-                        "--batch_size", str(batch_size), "--random_state", str(seed),
+                        "--batch_size", str(effective_batch_size), "--random_state", str(seed),
                         "--sample_rate", str(sample_rate), "--lab_order_delay", str(lab_delay),
                         "--chunksize", str(chunksize), "--fit_kwargs", fit_kwargs_json,
                         "--splits_file", splits_file,
@@ -467,7 +468,7 @@ class SubmitJobs:
                     "gpu": gpu,
                     "savedir": savedir,
                     "missingness": missingness,
-                    "batch_size": batch_size,
+                    "batch_size": effective_batch_size,
                     "random_state": seed,
                     "sample_rate": sample_rate,
                     "lab_order_delay": lab_delay,
@@ -712,7 +713,7 @@ class SubmitJobs:
         model: str,
         fit_kwargs_overrides: dict[str, Any],
         global_fit_kwargs: dict[str, Any],
-    ) -> list[tuple[str, dict[str, Any]]]:
+    ) -> list[tuple[str, dict[str, Any], int | None]]:
         # several attempts to load what we expect to be a json object
 
         raw = fit_kwargs_overrides.get(model, global_fit_kwargs)
@@ -720,10 +721,10 @@ class SubmitJobs:
             raw = json.loads(raw)
 
         if isinstance(raw, dict):
-            return [("", raw)]
+            return [("", raw, None)]
 
         if isinstance(raw, list):
-            variants: list[tuple[str, dict[str, Any]]] = []
+            variants: list[tuple[str, dict[str, Any], int | None]] = []
             for idx, item in enumerate(raw, start=1):
                 if isinstance(item, str):
                     item = json.loads(item)
@@ -732,8 +733,20 @@ class SubmitJobs:
                         f"model_fit_kwargs_map[{model}] list entries must be dicts"
                     )
                 name = item.get("_name", f"cfg{idx}")
-                cfg = {k: v for k, v in item.items() if k != "_name"}
-                variants.append((_sanitize_name(str(name)), cfg))
+                batch_size = item.get("batch_size")
+                if batch_size is not None:
+                    try:
+                        batch_size = int(batch_size)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            f"model_fit_kwargs_map[{model}] batch_size must be a positive integer"
+                        ) from exc
+                    if batch_size < 1:
+                        raise ValueError(
+                            f"model_fit_kwargs_map[{model}] batch_size must be a positive integer"
+                        )
+                cfg = {k: v for k, v in item.items() if k not in {"_name", "batch_size"}}
+                variants.append((_sanitize_name(str(name)), cfg, batch_size))
             return variants
 
         raise ValueError(

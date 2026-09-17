@@ -618,6 +618,7 @@ class Trainer:
                  history_seconds=8 * 60 * 60,
                  validation_landmarks_per_patient=4,
                  training_sampling_strategy="uniform",
+                 training_chunks_per_patient_per_epoch="auto",
                  progress_bar=False,
                  training_landmark_diagnostic_patients=1024,
                  chunk_missingness_max_fraction=None,
@@ -695,7 +696,7 @@ class Trainer:
             0, 20, 40, and 60 minutes before delivery. Unlike randomly
             resampled validation chunks, this produces a stable loss for early
             stopping.
-        training_sampling_strategy : {"uniform", "stratified_elapsed", "terminal_balanced", "quartiles_plus_terminal", "all"}, default="uniform"
+        training_sampling_strategy : {"uniform", "stratified_elapsed", "stratified_elapsed_plus_terminal", "terminal_balanced", "quartiles_plus_terminal"}, default="uniform"
             Training endpoint policy. ``"stratified_elapsed"`` rotates each
             patient across the elapsed-time strata defined by the validation
             landmarks, while sampling only from its eligible starts. It never
@@ -708,6 +709,10 @@ class Trainer:
             every epoch: one random chunk from each elapsed-time quartile and
             one random chunk ending within 20 minutes of delivery. Validation
             always uses the common fixed delivery-relative endpoint panel.
+            ``"stratified_elapsed_plus_terminal"`` uses the elapsed-time
+            strata plus the final-20-minute terminal stratum.
+        training_chunks_per_patient_per_epoch : {"auto", "all_strata"} or int, default="auto"
+            Per-PID training chunk budget forwarded to ``RandomChunkLoader``.
         progress_bar : bool, default=False
             Show HDF5, chunk-enumeration, and training-epoch progress bars.
         training_landmark_diagnostic_patients : int, default=1024
@@ -878,12 +883,15 @@ class Trainer:
             )
         self.training_sampling_strategy = str(self.training_sampling_strategy).strip().lower()
         if self.training_sampling_strategy not in {
-            "uniform", "stratified_elapsed", "terminal_balanced", "quartiles_plus_terminal", "all"
+            "uniform", "stratified_elapsed", "stratified_elapsed_plus_terminal",
+            "terminal_balanced", "quartiles_plus_terminal"
         }:
             raise ValueError(
                 "training_sampling_strategy must be 'uniform', 'stratified_elapsed', "
-                "'terminal_balanced', 'quartiles_plus_terminal', or 'all'"
+                "'stratified_elapsed_plus_terminal', 'terminal_balanced', or "
+                "'quartiles_plus_terminal'"
             )
+        self.training_chunks_per_patient_per_epoch = training_chunks_per_patient_per_epoch
         self.training_landmark_diagnostic_patients = int(
             self.training_landmark_diagnostic_patients
         )
@@ -963,6 +971,7 @@ class Trainer:
             "validation_landmarks_per_patient": int(self.validation_landmarks_per_patient),
             "validation_panel": self._validation_panel_name(),
             "training_sampling_strategy": self.training_sampling_strategy,
+            "training_chunks_per_patient_per_epoch": self.training_chunks_per_patient_per_epoch,
             "chunk_missingness_max_fraction": self.chunk_missingness_max_fraction,
             "fit_kwargs": self.fit_kwargs,
             "optimizer": self.optimizer,
@@ -1122,6 +1131,8 @@ class Trainer:
             f"missingness_indicator_channels={self.missingness_indicator_channels} "
             f"validation_landmarks_per_patient={self.validation_landmarks_per_patient} "
             f"training_sampling_strategy={self.training_sampling_strategy} "
+            f"training_chunks_per_patient_per_epoch="
+            f"{self.training_chunks_per_patient_per_epoch} "
             f"missing_data_method={self.missing_data_method} "
             f"chunk_missingness_max_fraction={self.chunk_missingness_max_fraction}",
             flush=True,
@@ -1264,6 +1275,7 @@ class Trainer:
                 history_window_count=history_window_count,
                 validation_landmarks_per_patient=self.validation_landmarks_per_patient,
                 training_sampling_strategy=self.training_sampling_strategy,
+                training_chunks_per_patient_per_epoch=self.training_chunks_per_patient_per_epoch,
                 progress_bar=self.progress_bar,
             )
             val_loader = RandomChunkLoader(
@@ -1280,6 +1292,7 @@ class Trainer:
                 history_window_count=history_window_count,
                 validation_landmarks_per_patient=self.validation_landmarks_per_patient,
                 training_sampling_strategy=self.training_sampling_strategy,
+                training_chunks_per_patient_per_epoch=self.training_chunks_per_patient_per_epoch,
                 progress_bar=self.progress_bar,
             )
             if self.training_landmark_diagnostic_patients:
@@ -1304,6 +1317,7 @@ class Trainer:
                     history_window_count=history_window_count,
                     validation_landmarks_per_patient=self.validation_landmarks_per_patient,
                     training_sampling_strategy=self.training_sampling_strategy,
+                    training_chunks_per_patient_per_epoch=self.training_chunks_per_patient_per_epoch,
                     progress_bar=self.progress_bar,
                 )
                 print(
@@ -1557,6 +1571,9 @@ class Trainer:
                         "optimization": optimizer_config,
                         "restore_best_validation_checkpoint": True,
                         "training_sampling_strategy": self.training_sampling_strategy,
+                        "training_chunks_per_patient_per_epoch": (
+                            self.training_chunks_per_patient_per_epoch
+                        ),
                         "validation_landmarks_per_patient": self.validation_landmarks_per_patient,
                         "validation_panel": self._validation_panel_name(),
                         "training_landmark_diagnostic_patients": self.training_landmark_diagnostic_patients,
@@ -1649,6 +1666,9 @@ class Trainer:
                        "validation_landmarks_per_patient": self.validation_landmarks_per_patient,
                        "validation_panel": self._validation_panel_name(),
                        "training_sampling_strategy": self.training_sampling_strategy,
+                       "training_chunks_per_patient_per_epoch": (
+                           self.training_chunks_per_patient_per_epoch
+                       ),
                        "mark_loss_weight": float(self.mark_loss_weight),
                        "missingness_indicator_channels": self.missingness_indicator_channels,
                        "missing_data_method": self.missing_data_method,
